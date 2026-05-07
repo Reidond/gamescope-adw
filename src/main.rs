@@ -55,10 +55,10 @@ fn real_main() -> Result<ExitCode, String> {
 
     #[cfg(unix)]
     {
-        return Err(render_launch_error(exec_gamescope(
+        Err(render_launch_error(exec_gamescope(
             &launch_settings,
             &request.game_command,
-        )));
+        )))
     }
 
     #[cfg(not(unix))]

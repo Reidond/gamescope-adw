@@ -59,8 +59,7 @@ pub fn run_settings_ui(
     }
 
     app.run_with_args(&["gamescope-gui"]);
-    let final_outcome = outcome.borrow().clone();
-    final_outcome
+    outcome.borrow().clone()
 }
 
 #[derive(Clone)]
@@ -346,28 +345,31 @@ fn build_window(
         let window = window.clone();
         let rows = rows.clone();
         let display_defaults = display_defaults.clone();
-        content.imp().command_banner.connect_button_clicked(move |_| {
-            let settings = rows.to_settings();
-            if let Err(err) = settings.to_gamescope_args() {
-                show_error(&window, "Invalid Gamescope settings", &err.to_string());
-                return;
-            }
+        content
+            .imp()
+            .command_banner
+            .connect_button_clicked(move |_| {
+                let settings = rows.to_settings();
+                if let Err(err) = settings.to_gamescope_args() {
+                    show_error(&window, "Invalid Gamescope settings", &err.to_string());
+                    return;
+                }
 
-            if let Err(err) = which::which("gamescope") {
-                show_error(
-                    &window,
-                    "Gamescope was not found",
-                    &format!("Install gamescope or make sure it is available in PATH. {err}"),
-                );
-                return;
-            }
+                if let Err(err) = which::which("gamescope") {
+                    show_error(
+                        &window,
+                        "Gamescope was not found",
+                        &format!("Install gamescope or make sure it is available in PATH. {err}"),
+                    );
+                    return;
+                }
 
-            *outcome.borrow_mut() = UiOutcome::Start {
-                settings,
-                display_defaults: display_defaults.clone(),
-            };
-            app.quit();
-        });
+                *outcome.borrow_mut() = UiOutcome::Start {
+                    settings,
+                    display_defaults: display_defaults.clone(),
+                };
+                app.quit();
+            });
     }
 
     window.present();

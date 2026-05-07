@@ -127,7 +127,7 @@ impl ProfileStore {
     pub fn load_from_path(path: PathBuf) -> Result<Self, ProfileError> {
         match fs::read_to_string(&path) {
             Ok(contents) => toml::from_str(&contents)
-                .map(|store| migrate_store(store))
+                .map(migrate_store)
                 .map_err(|source| ProfileError::Parse { path, source }),
             Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(Self::default()),
             Err(source) => Err(ProfileError::Read { path, source }),
