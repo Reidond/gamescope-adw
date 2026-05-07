@@ -1,0 +1,98 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    name: CI gate
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build release binary
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      kind: ${{ steps.version.outputs.kind }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine release kind
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "kind=stable" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "kind=nightly" >> "$GITHUB_OUTPUT"
+            echo "version=nightly-$(date -u +%Y%m%d)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install GTK and libadwaita
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            blueprint-compiler \
+            pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked
+      - name: Stage artifact
+        run: |
+          mkdir -p dist staging
+          install -m 0755 target/release/gamescope-gui staging/gamescope-gui
+          tar -C staging -czf \
+            "dist/gamescope-gui-${{ steps.version.outputs.version }}-x86_64-linux.tar.gz" \
+            gamescope-gui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gamescope-gui-x86_64-linux
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Move nightly tag
+        if: needs.build.outputs.kind == 'nightly'
+        run: |
+          git tag -f nightly
+          git push --force origin nightly
+      - name: Publish stable release
+        if: needs.build.outputs.kind == 'stable'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+      - name: Publish nightly release
+        if: needs.build.outputs.kind == 'nightly'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly build
+          prerelease: true
+          make_latest: false
+          files: dist/*.tar.gz
+          fail_on_unmatched_files: true
+          body: |
+            Rolling nightly build from `main` (${{ github.sha }}).
+
+            Automatically updated on each push to `main`.
