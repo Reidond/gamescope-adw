@@ -5,6 +5,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gamescope_gui::profiles::ProfileIdentity;
 use gamescope_gui::settings::{Filter, GamescopeSettings, Resolution, Scaler, WindowMode};
+use gtk::gdk;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk::{gio, glib};
 
@@ -51,6 +52,7 @@ struct SettingsRows {
     output_width: adw::SpinRow,
     output_height: adw::SpinRow,
     nested_enabled: adw::SwitchRow,
+    nested_preset: adw::ComboRow,
     nested_width: adw::SpinRow,
     nested_height: adw::SpinRow,
     refresh_enabled: adw::SwitchRow,
@@ -65,6 +67,12 @@ struct SettingsRows {
     mangoapp: adw::SwitchRow,
     steam: adw::SwitchRow,
     extra_args: adw::EntryRow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ResolutionPreset {
+    label: &'static str,
+    resolution: Resolution,
 }
 
 mod imp {
@@ -88,6 +96,8 @@ mod imp {
         pub output_height: TemplateChild<adw::SpinRow>,
         #[template_child]
         pub nested_enabled: TemplateChild<adw::SwitchRow>,
+        #[template_child]
+        pub nested_preset: TemplateChild<adw::ComboRow>,
         #[template_child]
         pub nested_width: TemplateChild<adw::SpinRow>,
         #[template_child]
@@ -158,38 +168,51 @@ impl GamescopeContent {
         command_preview: &str,
     ) -> SettingsRows {
         let imp = self.imp();
+        let defaults = DisplayDefaults::detect().unwrap_or_default();
         imp.window_title.set_subtitle(&identity.label);
         imp.start_button.add_css_class("suggested-action");
         imp.integration_group.set_description(Some(command_preview));
 
-        imp.output_enabled
-            .set_active(settings.output_resolution.is_some());
-        imp.output_width.set_value(
-            settings
-                .output_resolution
-                .map(|resolution| resolution.width)
-                .unwrap_or(1920) as f64,
+        let output_resolution = settings.output_resolution.unwrap_or(defaults.native);
+        let nested_resolution = settings.nested_resolution.unwrap_or(defaults.native);
+
+        imp.output_enabled.set_active(true);
+        imp.output_enabled.set_subtitle(&format!(
+            "Native monitor target: {}x{}",
+            defaults.native.width, defaults.native.height
+        ));
+        imp.output_width.set_value(output_resolution.width as f64);
+        imp.output_height.set_value(output_resolution.height as f64);
+        imp.nested_enabled.set_active(true);
+        imp.nested_enabled.set_subtitle(&format!(
+            "Suggested from monitor: {}",
+            defaults
+                .presets
+                .iter()
+                .map(|preset| format!(
+                    "{} {}x{}",
+                    preset.label, preset.resolution.width, preset.resolution.height
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        let preset_labels = defaults
+            .presets
+            .iter()
+            .map(|preset| {
+                format!(
+                    "{} - {}x{}",
+                    preset.label, preset.resolution.width, preset.resolution.height
+                )
+            })
+            .collect::<Vec<_>>();
+        set_combo_model_from_strings(
+            &imp.nested_preset,
+            &preset_labels,
+            defaults.preset_index_for(nested_resolution),
         );
-        imp.output_height.set_value(
-            settings
-                .output_resolution
-                .map(|resolution| resolution.height)
-                .unwrap_or(1080) as f64,
-        );
-        imp.nested_enabled
-            .set_active(settings.nested_resolution.is_some());
-        imp.nested_width.set_value(
-            settings
-                .nested_resolution
-                .map(|resolution| resolution.width)
-                .unwrap_or(1280) as f64,
-        );
-        imp.nested_height.set_value(
-            settings
-                .nested_resolution
-                .map(|resolution| resolution.height)
-                .unwrap_or(720) as f64,
-        );
+        imp.nested_width.set_value(nested_resolution.width as f64);
+        imp.nested_height.set_value(nested_resolution.height as f64);
         imp.refresh_enabled
             .set_active(settings.nested_refresh.is_some());
         imp.refresh
@@ -218,6 +241,7 @@ impl GamescopeContent {
             output_width: imp.output_width.get(),
             output_height: imp.output_height.get(),
             nested_enabled: imp.nested_enabled.get(),
+            nested_preset: imp.nested_preset.get(),
             nested_width: imp.nested_width.get(),
             nested_height: imp.nested_height.get(),
             refresh_enabled: imp.refresh_enabled.get(),
@@ -252,6 +276,7 @@ fn build_window(
 
     let content = GamescopeContent::new();
     let rows = content.configure(identity, &settings, command_preview);
+    connect_resolution_preset(&rows);
     window.set_content(Some(&content));
 
     {
@@ -286,6 +311,22 @@ fn build_window(
     }
 
     window.present();
+}
+
+fn connect_resolution_preset(rows: &SettingsRows) {
+    let nested_width = rows.nested_width.clone();
+    let nested_height = rows.nested_height.clone();
+    rows.nested_preset.connect_selected_notify(move |row| {
+        let Some(label) = selected_string(row) else {
+            return;
+        };
+        let Some(resolution) = parse_preset_resolution(&label) else {
+            return;
+        };
+
+        nested_width.set_value(resolution.width as f64);
+        nested_height.set_value(resolution.height as f64);
+    });
 }
 
 impl SettingsRows {
@@ -323,6 +364,99 @@ fn set_combo_model(row: &adw::ComboRow, labels: &[&str], selected: u32) {
     let model = gtk::StringList::new(labels);
     row.set_model(Some(&model));
     row.set_selected(selected);
+}
+
+fn set_combo_model_from_strings(row: &adw::ComboRow, labels: &[String], selected: u32) {
+    let model = labels.iter().cloned().collect::<gtk::StringList>();
+    row.set_model(Some(&model));
+    row.set_selected(selected.min(labels.len().saturating_sub(1) as u32));
+}
+
+fn selected_string(row: &adw::ComboRow) -> Option<String> {
+    row.model()?
+        .item(row.selected())?
+        .downcast::<gtk::StringObject>()
+        .ok()
+        .map(|item| item.string().to_string())
+}
+
+fn parse_preset_resolution(label: &str) -> Option<Resolution> {
+    let resolution = label.rsplit_once(' ')?.1;
+    let (width, height) = resolution.split_once('x')?;
+    Some(Resolution {
+        width: width.parse().ok()?,
+        height: height.parse().ok()?,
+    })
+}
+
+#[derive(Debug, Clone)]
+struct DisplayDefaults {
+    native: Resolution,
+    presets: Vec<ResolutionPreset>,
+}
+
+impl DisplayDefaults {
+    fn detect() -> Option<Self> {
+        let display = gdk::Display::default()?;
+        let monitors = display.monitors();
+        let monitor = monitors.item(0)?.downcast::<gdk::Monitor>().ok()?;
+        let geometry = monitor.geometry();
+        let native = Resolution {
+            width: geometry.width().try_into().ok()?,
+            height: geometry.height().try_into().ok()?,
+        };
+        Some(Self::new(native))
+    }
+
+    fn new(native: Resolution) -> Self {
+        let mut presets = Vec::new();
+        push_unique_preset(&mut presets, "Native", native);
+        push_unique_preset(&mut presets, "1.5x scale", scaled_resolution(native, 1.5));
+        push_unique_preset(&mut presets, "2x scale", scaled_resolution(native, 2.0));
+
+        Self { native, presets }
+    }
+
+    fn preset_index_for(&self, resolution: Resolution) -> u32 {
+        self.presets
+            .iter()
+            .position(|preset| preset.resolution == resolution)
+            .unwrap_or_default() as u32
+    }
+}
+
+impl Default for DisplayDefaults {
+    fn default() -> Self {
+        Self::new(Resolution {
+            width: 1920,
+            height: 1080,
+        })
+    }
+}
+
+fn push_unique_preset(
+    presets: &mut Vec<ResolutionPreset>,
+    label: &'static str,
+    resolution: Resolution,
+) {
+    if resolution.width < 320 || resolution.height < 240 {
+        return;
+    }
+    if presets.iter().any(|preset| preset.resolution == resolution) {
+        return;
+    }
+    presets.push(ResolutionPreset { label, resolution });
+}
+
+fn scaled_resolution(native: Resolution, scale: f64) -> Resolution {
+    Resolution {
+        width: round_to_even((native.width as f64 / scale).round() as u32),
+        height: round_to_even((native.height as f64 / scale).round() as u32),
+    }
+}
+
+fn round_to_even(value: u32) -> u32 {
+    value - (value % 2)
 }
 
 fn show_error(parent: &adw::ApplicationWindow, heading: &str, body: &str) {
