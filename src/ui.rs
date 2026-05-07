@@ -30,18 +30,15 @@ pub fn run_settings_ui(
     let outcome = Rc::new(RefCell::new(UiOutcome::Cancel));
     let identity = identity.clone();
     let command_preview = render_command_preview(game_command);
-    let display_defaults = DisplayDefaults::detect().unwrap_or_default();
 
     {
         let outcome = Rc::clone(&outcome);
-        let display_defaults = display_defaults.clone();
         app.connect_activate(move |app| {
             build_window(
                 app,
                 &identity,
                 initial_settings.clone(),
                 &command_preview,
-                display_defaults.clone(),
                 Rc::clone(&outcome),
             );
         });
@@ -267,9 +264,9 @@ fn build_window(
     identity: &ProfileIdentity,
     settings: GamescopeSettings,
     command_preview: &str,
-    display_defaults: DisplayDefaults,
     outcome: Rc<RefCell<UiOutcome>>,
 ) {
+    let display_defaults = DisplayDefaults::detect().unwrap_or_default();
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("Gamescope")
