@@ -417,7 +417,7 @@ fn show_about_dialog(parent: &adw::ApplicationWindow) {
         .application_icon("input-gaming-symbolic")
         .developer_name("Andrii Shafar")
         .version(env!("CARGO_PKG_VERSION"))
-        .website("https://github.com/andriishafar/gamescope-gui")
+        .website("https://github.com/Reidond/gamescope-adw")
         .license_type(gtk::License::MitX11)
         .comments("Native GTK4 wrapper for launching games with Gamescope.")
         .build();
