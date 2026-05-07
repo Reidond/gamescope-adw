@@ -3,15 +3,18 @@ use std::ffi::OsString;
 use std::rc::Rc;
 
 use adw::prelude::*;
+use gamescope_gui::display::DisplayDefaults;
 use gamescope_gui::profiles::ProfileIdentity;
 use gamescope_gui::settings::{Filter, GamescopeSettings, Resolution, Scaler, WindowMode};
-use gtk::gdk;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk::{gio, glib};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiOutcome {
-    Start(GamescopeSettings),
+    Start {
+        settings: GamescopeSettings,
+        display_defaults: DisplayDefaults,
+    },
     Cancel,
 }
 
@@ -27,15 +30,18 @@ pub fn run_settings_ui(
     let outcome = Rc::new(RefCell::new(UiOutcome::Cancel));
     let identity = identity.clone();
     let command_preview = render_command_preview(game_command);
+    let display_defaults = DisplayDefaults::detect().unwrap_or_default();
 
     {
         let outcome = Rc::clone(&outcome);
+        let display_defaults = display_defaults.clone();
         app.connect_activate(move |app| {
             build_window(
                 app,
                 &identity,
                 initial_settings.clone(),
                 &command_preview,
+                display_defaults.clone(),
                 Rc::clone(&outcome),
             );
         });
@@ -67,12 +73,6 @@ struct SettingsRows {
     mangoapp: adw::SwitchRow,
     steam: adw::SwitchRow,
     extra_args: adw::EntryRow,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ResolutionPreset {
-    label: &'static str,
-    resolution: Resolution,
 }
 
 mod imp {
@@ -166,9 +166,9 @@ impl GamescopeContent {
         identity: &ProfileIdentity,
         settings: &GamescopeSettings,
         command_preview: &str,
+        defaults: &DisplayDefaults,
     ) -> SettingsRows {
         let imp = self.imp();
-        let defaults = DisplayDefaults::detect().unwrap_or_default();
         imp.window_title.set_subtitle(&identity.label);
         imp.start_button.add_css_class("suggested-action");
         imp.integration_group.set_description(Some(command_preview));
@@ -267,6 +267,7 @@ fn build_window(
     identity: &ProfileIdentity,
     settings: GamescopeSettings,
     command_preview: &str,
+    display_defaults: DisplayDefaults,
     outcome: Rc<RefCell<UiOutcome>>,
 ) {
     let window = adw::ApplicationWindow::builder()
@@ -277,7 +278,7 @@ fn build_window(
         .build();
 
     let content = GamescopeContent::new();
-    let rows = content.configure(identity, &settings, command_preview);
+    let rows = content.configure(identity, &settings, command_preview, &display_defaults);
     connect_resolution_preset(&rows);
     window.set_content(Some(&content));
 
@@ -307,7 +308,10 @@ fn build_window(
                 return;
             }
 
-            *outcome.borrow_mut() = UiOutcome::Start(settings);
+            *outcome.borrow_mut() = UiOutcome::Start {
+                settings,
+                display_defaults: display_defaults.clone(),
+            };
             app.quit();
         });
     }
@@ -389,77 +393,6 @@ fn parse_preset_resolution(label: &str) -> Option<Resolution> {
         width: width.parse().ok()?,
         height: height.parse().ok()?,
     })
-}
-
-#[derive(Debug, Clone)]
-struct DisplayDefaults {
-    native: Resolution,
-    presets: Vec<ResolutionPreset>,
-}
-
-impl DisplayDefaults {
-    fn detect() -> Option<Self> {
-        let display = gdk::Display::default()?;
-        let monitors = display.monitors();
-        let monitor = monitors.item(0)?.downcast::<gdk::Monitor>().ok()?;
-        let geometry = monitor.geometry();
-        let scale = <gdk::Monitor as gdk::prelude::MonitorExt>::scale(&monitor).max(1.0);
-        let native = Resolution {
-            width: round_to_even((geometry.width() as f64 * scale).round() as u32),
-            height: round_to_even((geometry.height() as f64 * scale).round() as u32),
-        };
-        Some(Self::new(native))
-    }
-
-    fn new(native: Resolution) -> Self {
-        let mut presets = Vec::new();
-        push_unique_preset(&mut presets, "Native", native);
-        push_unique_preset(&mut presets, "1.5x scale", scaled_resolution(native, 1.5));
-        push_unique_preset(&mut presets, "2x scale", scaled_resolution(native, 2.0));
-
-        Self { native, presets }
-    }
-
-    fn preset_index_for(&self, resolution: Resolution) -> u32 {
-        self.presets
-            .iter()
-            .position(|preset| preset.resolution == resolution)
-            .unwrap_or_default() as u32
-    }
-}
-
-impl Default for DisplayDefaults {
-    fn default() -> Self {
-        Self::new(Resolution {
-            width: 1920,
-            height: 1080,
-        })
-    }
-}
-
-fn push_unique_preset(
-    presets: &mut Vec<ResolutionPreset>,
-    label: &'static str,
-    resolution: Resolution,
-) {
-    if resolution.width < 320 || resolution.height < 240 {
-        return;
-    }
-    if presets.iter().any(|preset| preset.resolution == resolution) {
-        return;
-    }
-    presets.push(ResolutionPreset { label, resolution });
-}
-
-fn scaled_resolution(native: Resolution, scale: f64) -> Resolution {
-    Resolution {
-        width: round_to_even((native.width as f64 / scale).round() as u32),
-        height: round_to_even((native.height as f64 / scale).round() as u32),
-    }
-}
-
-fn round_to_even(value: u32) -> u32 {
-    value - (value % 2)
 }
 
 fn show_error(parent: &adw::ApplicationWindow, heading: &str, body: &str) {

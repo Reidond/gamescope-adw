@@ -36,10 +36,19 @@ fn real_main() -> Result<ExitCode, String> {
     let mut store = ProfileStore::load().map_err(|err| err.to_string())?;
     let settings = store.settings_for(&identity);
 
-    let settings = match ui::run_settings_ui(&identity, settings, &request.game_command) {
-        ui::UiOutcome::Start(settings) => settings,
-        ui::UiOutcome::Cancel => return Ok(ExitCode::SUCCESS),
-    };
+    let (settings, launch_settings) =
+        match ui::run_settings_ui(&identity, settings, &request.game_command) {
+            ui::UiOutcome::Start {
+                settings,
+                display_defaults,
+            } => {
+                let launch_settings = settings
+                    .clone()
+                    .with_resolution_defaults(display_defaults.native);
+                (settings, launch_settings)
+            }
+            ui::UiOutcome::Cancel => return Ok(ExitCode::SUCCESS),
+        };
 
     store.upsert(&identity, settings.clone());
     store.save().map_err(|err| err.to_string())?;
@@ -47,7 +56,7 @@ fn real_main() -> Result<ExitCode, String> {
     #[cfg(unix)]
     {
         return Err(render_launch_error(exec_gamescope(
-            &settings,
+            &launch_settings,
             &request.game_command,
         )));
     }
@@ -55,7 +64,7 @@ fn real_main() -> Result<ExitCode, String> {
     #[cfg(not(unix))]
     {
         let status =
-            run_gamescope(&settings, &request.game_command).map_err(render_launch_error)?;
+            run_gamescope(&launch_settings, &request.game_command).map_err(render_launch_error)?;
         Ok(exit_code_from_i32(process_exit_code(status)))
     }
 }

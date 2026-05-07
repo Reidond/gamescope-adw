@@ -84,6 +84,14 @@ impl Default for GamescopeSettings {
 }
 
 impl GamescopeSettings {
+    pub fn with_resolution_defaults(self, resolution: Resolution) -> Self {
+        Self {
+            output_resolution: Some(self.output_resolution.unwrap_or(resolution)),
+            nested_resolution: Some(self.nested_resolution.unwrap_or(resolution)),
+            ..self
+        }
+    }
+
     pub fn to_gamescope_args(&self) -> Result<Vec<OsString>, SettingsError> {
         let mut args = Vec::new();
 
@@ -338,5 +346,37 @@ mod tests {
             settings.to_gamescope_args(),
             Err(SettingsError::InvalidExtraArgs(_))
         ));
+    }
+
+    #[test]
+    fn fills_in_missing_resolution_defaults() {
+        let settings = GamescopeSettings {
+            output_resolution: None,
+            nested_resolution: Some(Resolution {
+                width: 1280,
+                height: 720,
+            }),
+            ..Default::default()
+        };
+
+        let settings = settings.with_resolution_defaults(Resolution {
+            width: 3840,
+            height: 2160,
+        });
+
+        assert_eq!(
+            settings.output_resolution,
+            Some(Resolution {
+                width: 3840,
+                height: 2160,
+            })
+        );
+        assert_eq!(
+            settings.nested_resolution,
+            Some(Resolution {
+                width: 1280,
+                height: 720,
+            })
+        );
     }
 }
