@@ -37,7 +37,7 @@ If `XDG_CONFIG_HOME` is not set, the standard fallback is:
 
 ## Build
 
-Install the native development packages for GTK4, libadwaita, GLib, Pango,
+Install the native development packages for GTK 4.14 or newer, libadwaita, GLib, Pango,
 Cairo, GDK Pixbuf, Graphene, pkg-config, and Blueprint, plus the runtime
 `gamescope` binary. Package names vary by distro; on Fedora the important
 packages are typically:
@@ -56,4 +56,20 @@ For core tests that do not need GTK development packages:
 
 ```sh
 cargo test --no-default-features
+```
+
+## Development
+
+Use a temporary XDG config directory when testing profile behavior without
+touching real saved profiles:
+
+```sh
+XDG_CONFIG_HOME="$(mktemp -d)" cargo run -- -- glxgears
+```
+
+For a repeatable local scratch profile store:
+
+```sh
+mkdir -p .run/xdg-config
+XDG_CONFIG_HOME="$PWD/.run/xdg-config" cargo run -- -- glxgears
 ```

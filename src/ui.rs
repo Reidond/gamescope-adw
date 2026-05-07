@@ -173,17 +173,19 @@ impl GamescopeContent {
         imp.start_button.add_css_class("suggested-action");
         imp.integration_group.set_description(Some(command_preview));
 
+        let has_output_resolution = settings.output_resolution.is_some();
+        let has_nested_resolution = settings.nested_resolution.is_some();
         let output_resolution = settings.output_resolution.unwrap_or(defaults.native);
         let nested_resolution = settings.nested_resolution.unwrap_or(defaults.native);
 
-        imp.output_enabled.set_active(true);
+        imp.output_enabled.set_active(has_output_resolution);
         imp.output_enabled.set_subtitle(&format!(
-            "Native monitor target: {}x{}",
+            "Defaults to native monitor target: {}x{}",
             defaults.native.width, defaults.native.height
         ));
         imp.output_width.set_value(output_resolution.width as f64);
         imp.output_height.set_value(output_resolution.height as f64);
-        imp.nested_enabled.set_active(true);
+        imp.nested_enabled.set_active(has_nested_resolution);
         imp.nested_enabled.set_subtitle(&format!(
             "Suggested from monitor: {}",
             defaults
@@ -401,9 +403,10 @@ impl DisplayDefaults {
         let monitors = display.monitors();
         let monitor = monitors.item(0)?.downcast::<gdk::Monitor>().ok()?;
         let geometry = monitor.geometry();
+        let scale = <gdk::Monitor as gdk::prelude::MonitorExt>::scale(&monitor).max(1.0);
         let native = Resolution {
-            width: geometry.width().try_into().ok()?,
-            height: geometry.height().try_into().ok()?,
+            width: round_to_even((geometry.width() as f64 * scale).round() as u32),
+            height: round_to_even((geometry.height() as f64 * scale).round() as u32),
         };
         Some(Self::new(native))
     }
