@@ -1,0 +1,171 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $GamescopeContent : Gtk.Box {
+  orientation: vertical;
+
+  Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      title-widget: Adw.WindowTitle window_title {
+        title: "Gamescope";
+      };
+
+      [start]
+      Button cancel_button {
+        label: "Cancel";
+      }
+
+      [end]
+      Button start_button {
+        label: "Start";
+      }
+    }
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup {
+        title: "Display";
+        description: "Configure the Gamescope window and game-side resolution.";
+
+        Adw.SwitchRow output_enabled {
+          title: "Custom output resolution";
+        }
+
+        Adw.SpinRow output_width {
+          title: "Output width";
+          adjustment: Adjustment {
+            lower: 320;
+            upper: 7680;
+            step-increment: 1;
+            page-increment: 10;
+          };
+          climb-rate: 1;
+          digits: 0;
+          numeric: true;
+        }
+
+        Adw.SpinRow output_height {
+          title: "Output height";
+          adjustment: Adjustment {
+            lower: 240;
+            upper: 4320;
+            step-increment: 1;
+            page-increment: 10;
+          };
+          climb-rate: 1;
+          digits: 0;
+          numeric: true;
+        }
+
+        Adw.SwitchRow nested_enabled {
+          title: "Custom game resolution";
+        }
+
+        Adw.SpinRow nested_width {
+          title: "Game width";
+          adjustment: Adjustment {
+            lower: 320;
+            upper: 7680;
+            step-increment: 1;
+            page-increment: 10;
+          };
+          climb-rate: 1;
+          digits: 0;
+          numeric: true;
+        }
+
+        Adw.SpinRow nested_height {
+          title: "Game height";
+          adjustment: Adjustment {
+            lower: 240;
+            upper: 4320;
+            step-increment: 1;
+            page-increment: 10;
+          };
+          climb-rate: 1;
+          digits: 0;
+          numeric: true;
+        }
+      }
+
+      Adw.PreferencesGroup {
+        title: "Performance";
+
+        Adw.SwitchRow refresh_enabled {
+          title: "Limit refresh rate";
+        }
+
+        Adw.SpinRow refresh {
+          title: "Refresh rate";
+          adjustment: Adjustment {
+            lower: 1;
+            upper: 1000;
+            step-increment: 1;
+            page-increment: 10;
+          };
+          climb-rate: 1;
+          digits: 0;
+          numeric: true;
+        }
+
+        Adw.SwitchRow fps_enabled {
+          title: "Limit FPS";
+        }
+
+        Adw.SpinRow fps {
+          title: "FPS limit";
+          adjustment: Adjustment {
+            lower: 1;
+            upper: 1000;
+            step-increment: 1;
+            page-increment: 10;
+          };
+          climb-rate: 1;
+          digits: 0;
+          numeric: true;
+        }
+      }
+
+      Adw.PreferencesGroup {
+        title: "Rendering";
+
+        Adw.ComboRow window_mode {
+          title: "Window mode";
+        }
+
+        Adw.ComboRow scaler {
+          title: "Scaler";
+        }
+
+        Adw.ComboRow filter {
+          title: "Filter";
+        }
+
+        Adw.SwitchRow hdr {
+          title: "HDR";
+        }
+
+        Adw.SwitchRow adaptive_sync {
+          title: "Variable refresh rate";
+        }
+      }
+
+      Adw.PreferencesGroup integration_group {
+        title: "Integration";
+
+        Adw.SwitchRow mangoapp {
+          title: "MangoHud overlay";
+        }
+
+        Adw.SwitchRow steam {
+          title: "Gamescope Steam integration mode";
+          subtitle: "Advanced; intended for running Steam itself inside Gamescope, not normal per-game Steam launch options.";
+        }
+
+        Adw.EntryRow extra_args {
+          title: "Extra Gamescope arguments";
+        }
+      }
+    };
+  }
+}

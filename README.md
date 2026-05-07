@@ -38,12 +38,12 @@ If `XDG_CONFIG_HOME` is not set, the standard fallback is:
 ## Build
 
 Install the native development packages for GTK4, libadwaita, GLib, Pango,
-Cairo, GDK Pixbuf, Graphene, and pkg-config, plus the runtime `gamescope`
-binary. Package names vary by distro; on Fedora the important packages are
-typically:
+Cairo, GDK Pixbuf, Graphene, pkg-config, and Blueprint, plus the runtime
+`gamescope` binary. Package names vary by distro; on Fedora the important
+packages are typically:
 
 ```sh
-sudo dnf install gtk4-devel libadwaita-devel gamescope pkgconf-pkg-config
+sudo dnf install gtk4-devel libadwaita-devel blueprint-compiler gamescope pkgconf-pkg-config
 ```
 
 Then build:
