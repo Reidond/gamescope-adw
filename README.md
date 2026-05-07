@@ -37,13 +37,20 @@ If `XDG_CONFIG_HOME` is not set, the standard fallback is:
 
 ## Install
 
-Install the latest release binary into `${XDG_BIN_DIR:-$HOME/.local/bin}`:
+Install the latest stable release binary into `${XDG_BIN_DIR:-$HOME/.local/bin}`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Reidond/gamescope-adw/main/scripts/install.sh | bash
 ```
 
-Other modes:
+Install the rolling nightly build of `main` instead (pass `--nightly` after the
+`-s` separator so `bash` forwards it to the script):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Reidond/gamescope-adw/main/scripts/install.sh | bash -s -- --nightly
+```
+
+Other modes when running the script locally:
 
 ```sh
 # Pinned version
