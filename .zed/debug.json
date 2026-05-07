@@ -1,0 +1,53 @@
+[
+  {
+    "label": "Debug gamescope-gui (glxgears)",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/target/debug/gamescope-gui",
+    "args": ["--", "glxgears"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "sourceLanguages": ["rust"],
+    "env": {
+      "RUST_BACKTRACE": "1",
+      "G_MESSAGES_DEBUG": "Adwaita,GLib-GIO"
+    },
+    "build": {
+      "command": "cargo",
+      "args": ["build", "--bin", "gamescope-gui"]
+    }
+  },
+  {
+    "label": "Debug gamescope-gui (scratch XDG profiles)",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/target/debug/gamescope-gui",
+    "args": ["--", "glxgears"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "sourceLanguages": ["rust"],
+    "env": {
+      "RUST_BACKTRACE": "1",
+      "XDG_CONFIG_HOME": "$ZED_WORKTREE_ROOT/.run/xdg-config"
+    },
+    "build": {
+      "command": "sh",
+      "args": [
+        "-c",
+        "mkdir -p .run/xdg-config && cargo build --bin gamescope-gui"
+      ]
+    }
+  },
+  {
+    "label": "Debug core tests (no GUI feature)",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "sourceLanguages": ["rust"],
+    "env": {
+      "RUST_BACKTRACE": "1"
+    },
+    "build": {
+      "command": "cargo",
+      "args": ["test", "--no-default-features", "--lib", "--no-run"]
+    }
+  }
+]
