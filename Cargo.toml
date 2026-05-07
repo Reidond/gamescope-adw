@@ -8,7 +8,7 @@ default = ["gui"]
 gui = ["dep:gtk", "gtk/blueprint", "dep:adw", "dep:which"]
 
 [dependencies]
-adw = { package = "libadwaita", version = "0.9.1", features = ["v1_4"], optional = true }
+adw = { package = "libadwaita", version = "0.9.1", features = ["v1_5"], optional = true }
 blake3 = "1.8.5"
 clap = { version = "4.6.1", features = ["derive"] }
 gtk = { package = "gtk4", version = "0.11.3", features = ["v4_14"], optional = true }

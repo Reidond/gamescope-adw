@@ -7,7 +7,21 @@ use gamescope_gui::display::DisplayDefaults;
 use gamescope_gui::profiles::ProfileIdentity;
 use gamescope_gui::settings::{Filter, GamescopeSettings, Resolution, Scaler, WindowMode};
 use gtk::subclass::prelude::ObjectSubclassIsExt;
-use gtk::{gio, glib};
+use gtk::{gdk, gio, glib};
+
+const LAUNCH_BANNER_CSS: &str = r#"
+banner.launch-banner button.text-button {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    font-weight: bold;
+}
+banner.launch-banner button.text-button:hover {
+    background-image: image(alpha(currentColor, 0.05));
+}
+banner.launch-banner button.text-button:active {
+    background-image: image(alpha(currentColor, 0.1));
+}
+"#;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UiOutcome {
@@ -51,16 +65,16 @@ pub fn run_settings_ui(
 
 #[derive(Clone)]
 struct SettingsRows {
-    output_enabled: adw::SwitchRow,
+    output_resolution_row: adw::ExpanderRow,
     output_width: adw::SpinRow,
     output_height: adw::SpinRow,
-    nested_enabled: adw::SwitchRow,
+    nested_resolution_row: adw::ExpanderRow,
     nested_preset: adw::ComboRow,
     nested_width: adw::SpinRow,
     nested_height: adw::SpinRow,
-    refresh_enabled: adw::SwitchRow,
+    refresh_row: adw::ExpanderRow,
     refresh: adw::SpinRow,
-    fps_enabled: adw::SwitchRow,
+    fps_row: adw::ExpanderRow,
     fps: adw::SpinRow,
     window_mode: adw::ComboRow,
     scaler: adw::ComboRow,
@@ -82,17 +96,17 @@ mod imp {
         #[template_child]
         pub window_title: TemplateChild<adw::WindowTitle>,
         #[template_child]
-        pub cancel_button: TemplateChild<gtk::Button>,
+        pub command_banner: TemplateChild<adw::Banner>,
         #[template_child]
-        pub start_button: TemplateChild<gtk::Button>,
+        pub menu_button: TemplateChild<gtk::MenuButton>,
         #[template_child]
-        pub output_enabled: TemplateChild<adw::SwitchRow>,
+        pub output_resolution_row: TemplateChild<adw::ExpanderRow>,
         #[template_child]
         pub output_width: TemplateChild<adw::SpinRow>,
         #[template_child]
         pub output_height: TemplateChild<adw::SpinRow>,
         #[template_child]
-        pub nested_enabled: TemplateChild<adw::SwitchRow>,
+        pub nested_resolution_row: TemplateChild<adw::ExpanderRow>,
         #[template_child]
         pub nested_preset: TemplateChild<adw::ComboRow>,
         #[template_child]
@@ -100,11 +114,11 @@ mod imp {
         #[template_child]
         pub nested_height: TemplateChild<adw::SpinRow>,
         #[template_child]
-        pub refresh_enabled: TemplateChild<adw::SwitchRow>,
+        pub refresh_row: TemplateChild<adw::ExpanderRow>,
         #[template_child]
         pub refresh: TemplateChild<adw::SpinRow>,
         #[template_child]
-        pub fps_enabled: TemplateChild<adw::SwitchRow>,
+        pub fps_row: TemplateChild<adw::ExpanderRow>,
         #[template_child]
         pub fps: TemplateChild<adw::SpinRow>,
         #[template_child]
@@ -117,8 +131,6 @@ mod imp {
         pub hdr: TemplateChild<adw::SwitchRow>,
         #[template_child]
         pub adaptive_sync: TemplateChild<adw::SwitchRow>,
-        #[template_child]
-        pub integration_group: TemplateChild<adw::PreferencesGroup>,
         #[template_child]
         pub mangoapp: TemplateChild<adw::SwitchRow>,
         #[template_child]
@@ -158,94 +170,19 @@ impl GamescopeContent {
         glib::Object::new()
     }
 
-    fn configure(
-        &self,
-        identity: &ProfileIdentity,
-        settings: &GamescopeSettings,
-        command_preview: &str,
-        defaults: &DisplayDefaults,
-    ) -> SettingsRows {
+    fn rows(&self) -> SettingsRows {
         let imp = self.imp();
-        imp.window_title.set_subtitle(&identity.label);
-        imp.start_button.add_css_class("suggested-action");
-        imp.integration_group.set_description(Some(command_preview));
-
-        let has_output_resolution = settings.output_resolution.is_some();
-        let has_nested_resolution = settings.nested_resolution.is_some();
-        let output_resolution = settings.output_resolution.unwrap_or(defaults.native);
-        let nested_resolution = settings.nested_resolution.unwrap_or(defaults.native);
-
-        imp.output_enabled.set_active(has_output_resolution);
-        imp.output_enabled.set_subtitle(&format!(
-            "Defaults to native monitor target: {}x{}",
-            defaults.native.width, defaults.native.height
-        ));
-        imp.output_width.set_value(output_resolution.width as f64);
-        imp.output_height.set_value(output_resolution.height as f64);
-        imp.nested_enabled.set_active(has_nested_resolution);
-        imp.nested_enabled.set_subtitle(&format!(
-            "Suggested from monitor: {}",
-            defaults
-                .presets
-                .iter()
-                .map(|preset| format!(
-                    "{} {}x{}",
-                    preset.label, preset.resolution.width, preset.resolution.height
-                ))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-        let preset_labels = defaults
-            .presets
-            .iter()
-            .map(|preset| {
-                format!(
-                    "{} - {}x{}",
-                    preset.label, preset.resolution.width, preset.resolution.height
-                )
-            })
-            .collect::<Vec<_>>();
-        set_combo_model_from_strings(
-            &imp.nested_preset,
-            &preset_labels,
-            defaults.preset_index_for(nested_resolution),
-        );
-        imp.nested_width.set_value(nested_resolution.width as f64);
-        imp.nested_height.set_value(nested_resolution.height as f64);
-        imp.refresh_enabled
-            .set_active(settings.nested_refresh.is_some());
-        imp.refresh
-            .set_value(settings.nested_refresh.unwrap_or(60) as f64);
-        imp.fps_enabled
-            .set_active(settings.framerate_limit.is_some());
-        imp.fps
-            .set_value(settings.framerate_limit.unwrap_or(60) as f64);
-
-        set_combo_model(
-            &imp.window_mode,
-            &WindowMode::LABELS,
-            settings.window_mode.index(),
-        );
-        set_combo_model(&imp.scaler, &Scaler::LABELS, settings.scaler.index());
-        set_combo_model(&imp.filter, &Filter::LABELS, settings.filter.index());
-
-        imp.hdr.set_active(settings.hdr);
-        imp.adaptive_sync.set_active(settings.adaptive_sync);
-        imp.mangoapp.set_active(settings.mangoapp);
-        imp.steam.set_active(settings.steam);
-        imp.extra_args.set_text(&settings.extra_args);
-
         SettingsRows {
-            output_enabled: imp.output_enabled.get(),
+            output_resolution_row: imp.output_resolution_row.get(),
             output_width: imp.output_width.get(),
             output_height: imp.output_height.get(),
-            nested_enabled: imp.nested_enabled.get(),
+            nested_resolution_row: imp.nested_resolution_row.get(),
             nested_preset: imp.nested_preset.get(),
             nested_width: imp.nested_width.get(),
             nested_height: imp.nested_height.get(),
-            refresh_enabled: imp.refresh_enabled.get(),
+            refresh_row: imp.refresh_row.get(),
             refresh: imp.refresh.get(),
-            fps_enabled: imp.fps_enabled.get(),
+            fps_row: imp.fps_row.get(),
             fps: imp.fps.get(),
             window_mode: imp.window_mode.get(),
             scaler: imp.scaler.get(),
@@ -257,6 +194,126 @@ impl GamescopeContent {
             extra_args: imp.extra_args.get(),
         }
     }
+
+    fn configure(
+        &self,
+        identity: &ProfileIdentity,
+        settings: &GamescopeSettings,
+        command_preview: &str,
+        defaults: &DisplayDefaults,
+    ) {
+        let imp = self.imp();
+        imp.window_title.set_title(&identity.label);
+        imp.window_title.set_subtitle("Gamescope settings");
+
+        imp.command_banner
+            .set_title(&format!("Launching: {}", command_preview));
+        imp.command_banner.set_tooltip_text(Some(command_preview));
+
+        imp.output_resolution_row.set_subtitle(&format!(
+            "Defaults to native monitor target: {}×{}",
+            defaults.native.width, defaults.native.height
+        ));
+
+        let preset_labels: Vec<String> = defaults
+            .presets
+            .iter()
+            .map(|preset| {
+                format!(
+                    "{} — {}×{}",
+                    preset.label, preset.resolution.width, preset.resolution.height
+                )
+            })
+            .collect();
+        let preset_model = preset_labels.iter().cloned().collect::<gtk::StringList>();
+        imp.nested_preset.set_model(Some(&preset_model));
+
+        set_combo_model(
+            &imp.window_mode,
+            &WindowMode::LABELS,
+            settings.window_mode.index(),
+        );
+        set_combo_model(&imp.scaler, &Scaler::LABELS, settings.scaler.index());
+        set_combo_model(&imp.filter, &Filter::LABELS, settings.filter.index());
+
+        self.rows().apply_settings(settings, defaults);
+    }
+}
+
+impl SettingsRows {
+    fn apply_settings(&self, settings: &GamescopeSettings, defaults: &DisplayDefaults) {
+        let output_resolution = settings.output_resolution.unwrap_or(defaults.native);
+        let nested_resolution = settings.nested_resolution.unwrap_or(defaults.native);
+
+        self.output_resolution_row
+            .set_enable_expansion(settings.output_resolution.is_some());
+        self.output_width.set_value(output_resolution.width as f64);
+        self.output_height
+            .set_value(output_resolution.height as f64);
+
+        self.nested_resolution_row
+            .set_enable_expansion(settings.nested_resolution.is_some());
+        self.nested_preset
+            .set_selected(defaults.preset_index_for(nested_resolution));
+        self.nested_width.set_value(nested_resolution.width as f64);
+        self.nested_height
+            .set_value(nested_resolution.height as f64);
+
+        self.refresh_row
+            .set_enable_expansion(settings.nested_refresh.is_some());
+        self.refresh
+            .set_value(settings.nested_refresh.unwrap_or(60) as f64);
+
+        self.fps_row
+            .set_enable_expansion(settings.framerate_limit.is_some());
+        self.fps
+            .set_value(settings.framerate_limit.unwrap_or(60) as f64);
+
+        self.window_mode.set_selected(settings.window_mode.index());
+        self.scaler.set_selected(settings.scaler.index());
+        self.filter.set_selected(settings.filter.index());
+
+        self.hdr.set_active(settings.hdr);
+        self.adaptive_sync.set_active(settings.adaptive_sync);
+        self.mangoapp.set_active(settings.mangoapp);
+        self.steam.set_active(settings.steam);
+        self.extra_args.set_text(&settings.extra_args);
+    }
+
+    fn to_settings(&self) -> GamescopeSettings {
+        GamescopeSettings {
+            output_resolution: self
+                .output_resolution_row
+                .enables_expansion()
+                .then(|| Resolution {
+                    width: self.output_width.value() as u32,
+                    height: self.output_height.value() as u32,
+                }),
+            nested_resolution: self
+                .nested_resolution_row
+                .enables_expansion()
+                .then(|| Resolution {
+                    width: self.nested_width.value() as u32,
+                    height: self.nested_height.value() as u32,
+                }),
+            nested_refresh: self
+                .refresh_row
+                .enables_expansion()
+                .then(|| self.refresh.value() as u32),
+            framerate_limit: self
+                .fps_row
+                .enables_expansion()
+                .then(|| self.fps.value() as u32),
+            window_mode: WindowMode::from_index(self.window_mode.selected()),
+            scaler: Scaler::from_index(self.scaler.selected()),
+            filter: Filter::from_index(self.filter.selected()),
+            hdr: self.hdr.is_active(),
+            adaptive_sync: self.adaptive_sync.is_active(),
+            mangoapp: self.mangoapp.is_active(),
+            steam: self.steam.is_active(),
+            extra_args: self.extra_args.text().to_string(),
+        }
+    }
 }
 
 fn build_window(
@@ -266,6 +323,7 @@ fn build_window(
     command_preview: &str,
     outcome: Rc<RefCell<UiOutcome>>,
 ) {
+    install_styles();
     let display_defaults = DisplayDefaults::detect().unwrap_or_default();
     let window = adw::ApplicationWindow::builder()
         .application(app)
@@ -275,21 +333,20 @@ fn build_window(
         .build();
 
     let content = GamescopeContent::new();
-    let rows = content.configure(identity, &settings, command_preview, &display_defaults);
+    content.configure(identity, &settings, command_preview, &display_defaults);
+    let rows = content.rows();
     connect_resolution_preset(&rows);
     window.set_content(Some(&content));
 
-    {
-        let app = app.clone();
-        content.imp().cancel_button.connect_clicked(move |_| {
-            app.quit();
-        });
-    }
+    install_window_actions(app, &window, &rows, &display_defaults);
+    install_app_actions(app, &window);
 
     {
         let app = app.clone();
         let window = window.clone();
-        content.imp().start_button.connect_clicked(move |_| {
+        let rows = rows.clone();
+        let display_defaults = display_defaults.clone();
+        content.imp().command_banner.connect_button_clicked(move |_| {
             let settings = rows.to_settings();
             if let Err(err) = settings.to_gamescope_args() {
                 show_error(&window, "Invalid Gamescope settings", &err.to_string());
@@ -316,6 +373,55 @@ fn build_window(
     window.present();
 }
 
+fn install_window_actions(
+    app: &adw::Application,
+    window: &adw::ApplicationWindow,
+    rows: &SettingsRows,
+    display_defaults: &DisplayDefaults,
+) {
+    let reset_action = gio::SimpleAction::new("reset", None);
+    {
+        let rows = rows.clone();
+        let display_defaults = display_defaults.clone();
+        reset_action.connect_activate(move |_, _| {
+            rows.apply_settings(&GamescopeSettings::default(), &display_defaults);
+        });
+    }
+    window.add_action(&reset_action);
+
+    let cancel_action = gio::SimpleAction::new("cancel", None);
+    {
+        let app = app.clone();
+        cancel_action.connect_activate(move |_, _| app.quit());
+    }
+    window.add_action(&cancel_action);
+    app.set_accels_for_action("win.cancel", &["Escape"]);
+}
+
+fn install_app_actions(app: &adw::Application, window: &adw::ApplicationWindow) {
+    if app.lookup_action("about").is_some() {
+        return;
+    }
+
+    let about_action = gio::SimpleAction::new("about", None);
+    let parent = window.clone();
+    about_action.connect_activate(move |_, _| show_about_dialog(&parent));
+    app.add_action(&about_action);
+}
+
+fn show_about_dialog(parent: &adw::ApplicationWindow) {
+    let dialog = adw::AboutDialog::builder()
+        .application_name("Gamescope GUI")
+        .application_icon("input-gaming-symbolic")
+        .developer_name("Andrii Shafar")
+        .version(env!("CARGO_PKG_VERSION"))
+        .website("https://github.com/andriishafar/gamescope-gui")
+        .license_type(gtk::License::MitX11)
+        .comments("Native GTK4 wrapper for launching games with Gamescope.")
+        .build();
+    dialog.present(Some(parent));
+}
+
 fn connect_resolution_preset(rows: &SettingsRows) {
     let nested_width = rows.nested_width.clone();
     let nested_height = rows.nested_height.clone();
@@ -332,47 +438,10 @@ fn connect_resolution_preset(rows: &SettingsRows) {
     });
 }
 
-impl SettingsRows {
-    fn to_settings(&self) -> GamescopeSettings {
-        GamescopeSettings {
-            output_resolution: self.output_enabled.is_active().then(|| Resolution {
-                width: self.output_width.value() as u32,
-                height: self.output_height.value() as u32,
-            }),
-            nested_resolution: self.nested_enabled.is_active().then(|| Resolution {
-                width: self.nested_width.value() as u32,
-                height: self.nested_height.value() as u32,
-            }),
-            nested_refresh: self
-                .refresh_enabled
-                .is_active()
-                .then(|| self.refresh.value() as u32),
-            framerate_limit: self
-                .fps_enabled
-                .is_active()
-                .then(|| self.fps.value() as u32),
-            window_mode: WindowMode::from_index(self.window_mode.selected()),
-            scaler: Scaler::from_index(self.scaler.selected()),
-            filter: Filter::from_index(self.filter.selected()),
-            hdr: self.hdr.is_active(),
-            adaptive_sync: self.adaptive_sync.is_active(),
-            mangoapp: self.mangoapp.is_active(),
-            steam: self.steam.is_active(),
-            extra_args: self.extra_args.text().to_string(),
-        }
-    }
-}
-
 fn set_combo_model(row: &adw::ComboRow, labels: &[&str], selected: u32) {
     let model = gtk::StringList::new(labels);
     row.set_model(Some(&model));
     row.set_selected(selected);
-}
-
-fn set_combo_model_from_strings(row: &adw::ComboRow, labels: &[String], selected: u32) {
-    let model = labels.iter().cloned().collect::<gtk::StringList>();
-    row.set_model(Some(&model));
-    row.set_selected(selected.min(labels.len().saturating_sub(1) as u32));
 }
 
 fn selected_string(row: &adw::ComboRow) -> Option<String> {
@@ -385,7 +454,7 @@ fn selected_string(row: &adw::ComboRow) -> Option<String> {
 
 fn parse_preset_resolution(label: &str) -> Option<Resolution> {
     let resolution = label.rsplit_once(' ')?.1;
-    let (width, height) = resolution.split_once('x')?;
+    let (width, height) = resolution.split_once('×')?;
     Some(Resolution {
         width: width.parse().ok()?,
         height: height.parse().ok()?,
@@ -393,9 +462,24 @@ fn parse_preset_resolution(label: &str) -> Option<Resolution> {
 }
 
 fn show_error(parent: &adw::ApplicationWindow, heading: &str, body: &str) {
-    let dialog = adw::MessageDialog::new(Some(parent), Some(heading), Some(body));
-    dialog.add_responses(&[("ok", "OK")]);
-    dialog.present();
+    let dialog = adw::AlertDialog::new(Some(heading), Some(body));
+    dialog.add_response("ok", "OK");
+    dialog.set_default_response(Some("ok"));
+    dialog.set_close_response("ok");
+    dialog.present(Some(parent));
+}
+
+fn install_styles() {
+    let Some(display) = gdk::Display::default() else {
+        return;
+    };
+    let provider = gtk::CssProvider::new();
+    provider.load_from_string(LAUNCH_BANNER_CSS);
+    gtk::style_context_add_provider_for_display(
+        &display,
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 }
 
 fn render_command_preview(command: &[OsString]) -> String {

@@ -9,124 +9,143 @@ template $GamescopeContent : Gtk.Box {
     Adw.HeaderBar {
       title-widget: Adw.WindowTitle window_title {
         title: "Gamescope";
+        subtitle: "Gamescope settings";
       };
 
-      [start]
-      Button cancel_button {
-        label: "Cancel";
-      }
-
       [end]
-      Button start_button {
-        label: "Start";
+      MenuButton menu_button {
+        icon-name: "open-menu-symbolic";
+        primary: true;
+        menu-model: primary_menu;
+        tooltip-text: "Main Menu";
       }
+    }
+
+    [top]
+    Adw.Banner command_banner {
+      revealed: true;
+      button-label: "Launch";
+
+      styles [
+        "launch-banner",
+      ]
     }
 
     content: Adw.PreferencesPage {
       Adw.PreferencesGroup {
         title: "Display";
-        description: "Configure the Gamescope window and game-side resolution.";
 
-        Adw.SwitchRow output_enabled {
+        Adw.ExpanderRow output_resolution_row {
           title: "Custom output resolution";
+          show-enable-switch: true;
+          enable-expansion: false;
+
+          Adw.SpinRow output_width {
+            title: "Width";
+            adjustment: Adjustment {
+              lower: 320;
+              upper: 7680;
+              step-increment: 1;
+              page-increment: 10;
+            };
+            climb-rate: 1;
+            digits: 0;
+            numeric: true;
+          }
+
+          Adw.SpinRow output_height {
+            title: "Height";
+            adjustment: Adjustment {
+              lower: 240;
+              upper: 4320;
+              step-increment: 1;
+              page-increment: 10;
+            };
+            climb-rate: 1;
+            digits: 0;
+            numeric: true;
+          }
         }
 
-        Adw.SpinRow output_width {
-          title: "Output width";
-          adjustment: Adjustment {
-            lower: 320;
-            upper: 7680;
-            step-increment: 1;
-            page-increment: 10;
-          };
-          climb-rate: 1;
-          digits: 0;
-          numeric: true;
-        }
-
-        Adw.SpinRow output_height {
-          title: "Output height";
-          adjustment: Adjustment {
-            lower: 240;
-            upper: 4320;
-            step-increment: 1;
-            page-increment: 10;
-          };
-          climb-rate: 1;
-          digits: 0;
-          numeric: true;
-        }
-
-        Adw.SwitchRow nested_enabled {
+        Adw.ExpanderRow nested_resolution_row {
           title: "Custom game resolution";
-        }
+          subtitle: "Internal resolution Gamescope renders at";
+          show-enable-switch: true;
+          enable-expansion: false;
 
-        Adw.ComboRow nested_preset {
-          title: "Game resolution preset";
-        }
+          Adw.ComboRow nested_preset {
+            title: "Preset";
+          }
 
-        Adw.SpinRow nested_width {
-          title: "Game width";
-          adjustment: Adjustment {
-            lower: 320;
-            upper: 7680;
-            step-increment: 1;
-            page-increment: 10;
-          };
-          climb-rate: 1;
-          digits: 0;
-          numeric: true;
-        }
+          Adw.SpinRow nested_width {
+            title: "Width";
+            adjustment: Adjustment {
+              lower: 320;
+              upper: 7680;
+              step-increment: 1;
+              page-increment: 10;
+            };
+            climb-rate: 1;
+            digits: 0;
+            numeric: true;
+          }
 
-        Adw.SpinRow nested_height {
-          title: "Game height";
-          adjustment: Adjustment {
-            lower: 240;
-            upper: 4320;
-            step-increment: 1;
-            page-increment: 10;
-          };
-          climb-rate: 1;
-          digits: 0;
-          numeric: true;
+          Adw.SpinRow nested_height {
+            title: "Height";
+            adjustment: Adjustment {
+              lower: 240;
+              upper: 4320;
+              step-increment: 1;
+              page-increment: 10;
+            };
+            climb-rate: 1;
+            digits: 0;
+            numeric: true;
+          }
         }
       }
 
       Adw.PreferencesGroup {
         title: "Performance";
 
-        Adw.SwitchRow refresh_enabled {
+        Adw.ExpanderRow refresh_row {
           title: "Limit refresh rate";
+          show-enable-switch: true;
+          enable-expansion: false;
+
+          Adw.SpinRow refresh {
+            title: "Refresh rate";
+            subtitle: "Hertz";
+            adjustment: Adjustment {
+              lower: 1;
+              upper: 1000;
+              step-increment: 1;
+              page-increment: 10;
+            };
+            climb-rate: 1;
+            digits: 0;
+            numeric: true;
+          }
         }
 
-        Adw.SpinRow refresh {
-          title: "Refresh rate";
-          adjustment: Adjustment {
-            lower: 1;
-            upper: 1000;
-            step-increment: 1;
-            page-increment: 10;
-          };
-          climb-rate: 1;
-          digits: 0;
-          numeric: true;
-        }
-
-        Adw.SwitchRow fps_enabled {
+        Adw.ExpanderRow fps_row {
           title: "Limit FPS";
-        }
+          show-enable-switch: true;
+          enable-expansion: false;
 
-        Adw.SpinRow fps {
-          title: "FPS limit";
-          adjustment: Adjustment {
-            lower: 1;
-            upper: 1000;
-            step-increment: 1;
-            page-increment: 10;
-          };
-          climb-rate: 1;
-          digits: 0;
-          numeric: true;
+          Adw.SpinRow fps {
+            title: "FPS limit";
+            subtitle: "Frames per second";
+            adjustment: Adjustment {
+              lower: 1;
+              upper: 1000;
+              step-increment: 1;
+              page-increment: 10;
+            };
+            climb-rate: 1;
+            digits: 0;
+            numeric: true;
+          }
         }
       }
 
@@ -139,37 +158,69 @@ template $GamescopeContent : Gtk.Box {
 
         Adw.ComboRow scaler {
           title: "Scaler";
+          subtitle: "Determines how the game image fits the output";
         }
 
         Adw.ComboRow filter {
           title: "Filter";
+          subtitle: "Image scaling algorithm";
         }
 
         Adw.SwitchRow hdr {
           title: "HDR";
+          subtitle: "Requires a compatible display and compositor";
         }
 
         Adw.SwitchRow adaptive_sync {
           title: "Variable refresh rate";
+          subtitle: "Synchronises display refresh with game framerate";
         }
       }
 
-      Adw.PreferencesGroup integration_group {
+      Adw.PreferencesGroup {
         title: "Integration";
 
         Adw.SwitchRow mangoapp {
           title: "MangoHud overlay";
+          subtitle: "Shows in-game performance metrics";
         }
+      }
+
+      Adw.PreferencesGroup {
+        title: "Extra arguments";
+        description: "Passed through to Gamescope. Example: --sharpness 4 --prefer-output DP-1";
+
+        Adw.EntryRow extra_args {
+          title: "Arguments";
+          show-apply-button: true;
+        }
+      }
+
+      Adw.PreferencesGroup {
+        title: "Advanced";
+        description: "Settings for unusual configurations. Most users should leave these off.";
 
         Adw.SwitchRow steam {
           title: "Gamescope Steam integration mode";
-          subtitle: "Advanced; intended for running Steam itself inside Gamescope, not normal per-game Steam launch options.";
-        }
-
-        Adw.EntryRow extra_args {
-          title: "Extra Gamescope arguments";
+          subtitle: "For running Steam itself inside Gamescope. Not recommended for per-game launch options.";
         }
       }
     };
+  }
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: "Reset to Defaults";
+      action: "win.reset";
+    }
+  }
+
+  section {
+    item {
+      label: "About Gamescope GUI";
+      action: "app.about";
+    }
   }
 }
